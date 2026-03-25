@@ -1,12 +1,17 @@
 import { useState, useCallback, useRef } from 'react';
-import type { TestConfig, TestRun, HttpMethod } from './types';
+import type { TestConfig, TestRun, HttpMethod, Suite, SuiteRun, RunStatus } from './types';
 import TestConfigForm from './components/TestConfigForm';
 import ResultsPanel from './components/ResultsPanel';
+import SuiteEditor from './components/SuiteEditor';
+import SuiteResultsPanel from './components/SuiteResultsPanel';
+import HistoryPanel from './components/HistoryPanel';
 import { runTest, abortRun } from './api/testRunner';
+import { runSuite } from './api/suiteRunner';
 
 // ─── Default form state ───────────────────────────────────────
 const DEFAULT_CONFIG: TestConfig = {
   name: '',
+  protocol: 'http',
   baseUrl: '',
   method: 'GET' as HttpMethod,
   path: '/',
@@ -23,7 +28,12 @@ const DEFAULT_CONFIG: TestConfig = {
   ],
 };
 
+type AppMode = 'single' | 'suite' | 'history';
+
 export default function App() {
+  const [mode, setMode] = useState<AppMode>('single');
+
+  // ── Single-test state ──────────────────────────────────────
   const [config, setConfig] = useState<TestConfig>(DEFAULT_CONFIG);
   const [run, setRun]       = useState<TestRun | null>(null);
   const runIdRef            = useRef<string>('');
@@ -33,14 +43,12 @@ export default function App() {
     runIdRef.current = '';
     try {
       await runTest(config, (updatedRun) => {
-        // Capture the run ID as soon as we get it so abort can use it
         if (updatedRun.id) runIdRef.current = updatedRun.id;
         setRun({ ...updatedRun });
       });
     } catch (err) {
       setRun(prev => prev ? {
-        ...prev,
-        status: 'failed',
+        ...prev, status: 'failed',
         error: err instanceof Error ? err.message : 'Unknown error',
         completedAt: new Date(),
       } : null);
@@ -50,13 +58,33 @@ export default function App() {
   const handleAbort = useCallback(async () => {
     if (runIdRef.current) {
       await abortRun(runIdRef.current);
-      // The SSE "done" event will update the run state automatically.
-      // Optimistically mark it so the button disappears immediately.
       setRun(prev => prev ? { ...prev, status: 'failed', error: 'Test aborted by user' } : null);
     }
   }, []);
 
   const isRunning = run?.status === 'running';
+
+  // ── Suite state ────────────────────────────────────────────
+  const [suiteRun, setSuiteRun]     = useState<SuiteRun | null>(null);
+  const [suiteRunning, setSuiteRunning] = useState(false);
+
+  const handleRunSuite = useCallback(async (suite: Suite) => {
+    setSuiteRunning(true);
+    setSuiteRun(null);
+    try {
+      await runSuite(suite, (updatedRun) => setSuiteRun({ ...updatedRun }));
+    } catch (err) {
+      console.error('Suite run failed:', err);
+    } finally {
+      setSuiteRunning(false);
+    }
+  }, []);
+
+  // Build a node-id → status map for the DAG node overlay
+  const suiteNodeStatuses: Record<string, RunStatus> = {};
+  suiteRun?.nodeRuns.forEach(nr => {
+    suiteNodeStatuses[nr.nodeId] = nr.status;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -78,11 +106,35 @@ export default function App() {
             fontSize: 10, fontWeight: 600, color: 'var(--text-muted)',
             background: 'var(--bg-raised)', border: '1px solid var(--border)',
             borderRadius: 4, padding: '2px 6px', letterSpacing: '0.05em',
-          }}>M1</span>
+          }}>M3</span>
+
+          {/* Mode switcher */}
+          <div style={{
+            display: 'flex', marginLeft: 16,
+            background: 'var(--bg-raised)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)', padding: 2, gap: 2,
+          }}>
+            {(['single', 'suite', 'history'] as AppMode[]).map(m => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                style={{
+                  background: mode === m ? 'var(--accent)' : 'none',
+                  border: 'none', cursor: 'pointer',
+                  padding: '4px 12px', borderRadius: 'var(--radius-sm)',
+                  fontSize: 11, fontWeight: 600,
+                  color: mode === m ? '#fff' : 'var(--text-muted)',
+                  textTransform: 'capitalize',
+                }}
+              >
+                {m === 'single' ? 'Single Test' : m === 'suite' ? 'Test Suite' : '📋 History'}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          {run?.status === 'completed' && (
+          {mode === 'single' && run?.status === 'completed' && (
             <span style={{ fontSize: 12, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 5 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M20 6L9 17l-5-5" strokeLinecap="round" />
@@ -90,7 +142,7 @@ export default function App() {
               Test passed
             </span>
           )}
-          {run?.status === 'failed' && (
+          {mode === 'single' && run?.status === 'failed' && (
             <span style={{ fontSize: 12, color: 'var(--error)', display: 'flex', alignItems: 'center', gap: 5 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
@@ -111,34 +163,57 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── Main split layout ── */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: '420px 1fr',
-        flex: 1, overflow: 'hidden',
-      }}>
-
-        {/* Left: Config form */}
-        <aside style={{
-          borderRight: '1px solid var(--border)',
-          overflowY: 'auto', padding: '16px',
-          background: 'var(--bg-base)',
+      {/* ── Single test layout ── */}
+      {mode === 'single' && (
+        <div style={{
+          display: 'grid', gridTemplateColumns: '420px 1fr',
+          flex: 1, overflow: 'hidden',
         }}>
-          <TestConfigForm
-            config={config}
-            onChange={setConfig}
-            onRun={handleRun}
-            isRunning={isRunning}
-          />
-        </aside>
+          <aside style={{
+            borderRight: '1px solid var(--border)',
+            overflowY: 'auto', padding: '16px',
+            background: 'var(--bg-base)',
+          }}>
+            <TestConfigForm
+              config={config}
+              onChange={setConfig}
+              onRun={handleRun}
+              isRunning={isRunning}
+            />
+          </aside>
+          <main style={{ overflowY: 'auto', padding: '16px', background: 'var(--bg-base)' }}>
+            <ResultsPanel run={run} onAbort={handleAbort} />
+          </main>
+        </div>
+      )}
 
-        {/* Right: Results */}
-        <main style={{
-          overflowY: 'auto', padding: '16px',
-          background: 'var(--bg-base)',
+      {/* ── Suite layout ── */}
+      {mode === 'suite' && (
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr 360px',
+          flex: 1, overflow: 'hidden',
         }}>
-          <ResultsPanel run={run} onAbort={handleAbort} />
-        </main>
-      </div>
+          {/* DAG canvas */}
+          <div style={{ overflow: 'hidden', borderRight: '1px solid var(--border)' }}>
+            <SuiteEditor
+              suiteRunNodeStatuses={suiteRunning || suiteRun ? suiteNodeStatuses : undefined}
+              onRunSuite={handleRunSuite}
+              isRunning={suiteRunning}
+            />
+          </div>
+          {/* Suite results */}
+          <div style={{ overflowY: 'auto', padding: '16px', background: 'var(--bg-base)' }}>
+            <SuiteResultsPanel suiteRun={suiteRun} />
+          </div>
+        </div>
+      )}
+
+      {/* ── History layout ── */}
+      {mode === 'history' && (
+        <div style={{ flex: 1, overflow: 'hidden', background: 'var(--bg-base)' }}>
+          <HistoryPanel />
+        </div>
+      )}
     </div>
   );
 }

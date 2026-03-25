@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { TestRun, MetricsSummary } from '../types';
+import MetricsChart from './MetricsChart';
 
 // k6 web dashboard always binds on this port (mapped in docker-compose).
 const DASHBOARD_URL = 'http://localhost:5665';
@@ -9,7 +10,7 @@ interface Props {
   onAbort?: () => void;
 }
 
-type Tab = 'dashboard' | 'logs';
+type Tab = 'dashboard' | 'logs' | 'metrics';
 
 // How long to wait before mounting the iframe, giving k6's dashboard
 // HTTP server time to start listening on port 5665.
@@ -27,8 +28,7 @@ export default function ResultsPanel({ run, onAbort }: Props) {
     }
   }, [run?.logs.length, tab]);
 
-  // Switch to dashboard tab automatically when a test starts, and
-  // delay mounting the iframe until k6's dashboard server is up.
+  // Auto-switch tabs: dashboard while running, metrics on completion (if available)
   useEffect(() => {
     if (run?.status === 'running') {
       setTab('dashboard');
@@ -36,7 +36,10 @@ export default function ResultsPanel({ run, onAbort }: Props) {
       const t = setTimeout(() => setDashboardReady(true), DASHBOARD_BOOT_MS);
       return () => clearTimeout(t);
     }
-  }, [run?.id]);
+    if ((run?.status === 'completed' || run?.status === 'failed') && run?.metrics) {
+      setTab('metrics');
+    }
+  }, [run?.id, run?.status]);
 
   if (!run) return <EmptyState />;
 
@@ -121,21 +124,31 @@ export default function ResultsPanel({ run, onAbort }: Props) {
         display: 'flex', gap: 2, flexShrink: 0,
         borderBottom: '1px solid var(--border)', paddingBottom: 0,
       }}>
-        {(['dashboard', 'logs'] as Tab[]).map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: '6px 14px', fontSize: 12, fontWeight: 600,
-              color: tab === t ? 'var(--accent)' : 'var(--text-muted)',
-              borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent',
-              marginBottom: -1, textTransform: 'capitalize', letterSpacing: '0.03em',
-            }}
-          >
-            {t === 'dashboard' ? '📊 Live Dashboard' : '📋 Logs'}
-          </button>
-        ))}
+        {(['dashboard', 'logs', 'metrics'] as Tab[]).map(t => {
+          const labels: Record<Tab, string> = {
+            dashboard: '📊 Live Dashboard',
+            logs:      '📋 Logs',
+            metrics:   '📈 Metrics',
+          };
+          const disabled = t === 'metrics' && !run.metrics;
+          return (
+            <button
+              key={t}
+              onClick={() => !disabled && setTab(t)}
+              disabled={disabled}
+              style={{
+                background: 'none', border: 'none',
+                cursor: disabled ? 'default' : 'pointer',
+                padding: '6px 14px', fontSize: 12, fontWeight: 600,
+                color: disabled ? 'var(--text-muted)' : tab === t ? 'var(--accent)' : 'var(--text-muted)',
+                borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent',
+                marginBottom: -1, opacity: disabled ? 0.4 : 1,
+              }}
+            >
+              {labels[t]}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── Tab content ── */}
@@ -234,6 +247,13 @@ export default function ResultsPanel({ run, onAbort }: Props) {
             </div>
           </div>
         )}
+
+        {/* Metrics charts — available after test completes */}
+        {tab === 'metrics' && run.metrics && (
+          <div style={{ padding: 16, overflowY: 'auto' }}>
+            <MetricsChart metrics={run.metrics} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -269,6 +289,8 @@ function StatusDot({ status }: { status: TestRun['status'] }) {
     running:   'var(--warning)',
     completed: 'var(--success)',
     failed:    'var(--error)',
+    pending:   'var(--text-muted)',
+    skipped:   '#6b7280',
   };
   return (
     <span style={{
@@ -285,6 +307,8 @@ const STATUS_LABELS: Record<TestRun['status'], string> = {
   running:   'Test running',
   completed: 'Test completed',
   failed:    'Test failed',
+  pending:   'Pending',
+  skipped:   'Skipped',
 };
 
 function MetricsGrid({ metrics }: { metrics: MetricsSummary }) {

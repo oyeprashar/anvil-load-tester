@@ -11,7 +11,7 @@ import (
 func main() {
 	k6Path := os.Getenv("K6_PATH")
 	if k6Path == "" {
-		k6Path = "k6" // assumes k6 is on PATH
+		k6Path = "k6"
 	}
 
 	addr := os.Getenv("ADDR")
@@ -19,8 +19,9 @@ func main() {
 		addr = ":8080"
 	}
 
-	manager := runner.New(k6Path)
-	server  := api.NewServer(manager)
+	manager      := runner.New(k6Path)
+	suiteManager := runner.NewSuiteManager(manager)
+	server       := api.NewServer(manager, suiteManager)
 
 	log.Fatal(server.ListenAndServe(addr))
 }

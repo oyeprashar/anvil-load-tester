@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -88,10 +89,13 @@ func (r *Run) broadcast(line string) {
 
 // ── Manager ───────────────────────────────────────────────────
 
-// Manager owns all active and recent runs.
+// Manager owns all active and recent runs, plus an in-memory history.
 type Manager struct {
 	runs   sync.Map // map[string]*Run
 	k6Path string
+
+	histMu  sync.RWMutex
+	history []*models.HistoryRecord // ordered oldest-first, capped at 200
 }
 
 // New creates a Manager. k6Path is the path to the k6 binary
@@ -113,8 +117,8 @@ func (m *Manager) Start(ctx context.Context, cfg models.TestConfig) (string, err
 	// Generate a unique run ID
 	id := fmt.Sprintf("%d", time.Now().UnixNano())
 
-	// Transpile config → k6 JS
-	script, err := transpiler.Generate(cfg)
+	// Transpile config → k6 JS (and proto file content for gRPC)
+	script, protoContent, err := transpiler.Generate(cfg)
 	if err != nil {
 		return "", fmt.Errorf("runner: transpile: %w", err)
 	}
@@ -130,9 +134,23 @@ func (m *Manager) Start(ctx context.Context, cfg models.TestConfig) (string, err
 	// HTML report lives outside the temp dir so it survives the defer cleanup.
 	htmlReportPath  := filepath.Join(os.TempDir(), "anvil-report-"+id+".html")
 
+	// Inject handleSummary so k6 writes the aggregate JSON to summaryPath.
+	// This is the k6 v1.x-recommended replacement for --summary-export.
+	script += "\nexport function handleSummary(data) {\n  return { " +
+		strconv.Quote(summaryPath) + ": JSON.stringify(data) };\n}\n"
+
 	if err := os.WriteFile(scriptPath, []byte(script), 0644); err != nil {
 		os.RemoveAll(dir)
 		return "", fmt.Errorf("runner: write script: %w", err)
+	}
+
+	// Write the proto file for gRPC tests so k6 can find it beside the script.
+	if protoContent != "" {
+		protoPath := filepath.Join(dir, "proto.proto")
+		if err := os.WriteFile(protoPath, []byte(protoContent), 0644); err != nil {
+			os.RemoveAll(dir)
+			return "", fmt.Errorf("runner: write proto: %w", err)
+		}
 	}
 
 	// Create a cancellable context with a hard timeout so a stuck test
@@ -150,18 +168,17 @@ func (m *Manager) Start(ctx context.Context, cfg models.TestConfig) (string, err
 	m.runs.Store(id, run)
 
 	// Run k6 asynchronously
-	go m.execute(runCtx, run, dir, scriptPath, summaryPath)
+	go m.execute(runCtx, run, cfg, dir, scriptPath, summaryPath)
 
 	return id, nil
 }
 
 // execute runs k6, streams output, then parses the summary.
-func (m *Manager) execute(ctx context.Context, run *Run, dir, scriptPath, summaryPath string) {
+func (m *Manager) execute(ctx context.Context, run *Run, cfg models.TestConfig, dir, scriptPath, summaryPath string) {
 	defer os.RemoveAll(dir)
 
 	cmd := exec.CommandContext(ctx,
 		m.k6Path, "run",
-		"--summary-export", summaryPath,
 		"--no-color",
 		scriptPath,
 	)
@@ -247,6 +264,24 @@ func (m *Manager) execute(ctx context.Context, run *Run, dir, scriptPath, summar
 	}
 	run.subscribers = nil
 	run.mu.Unlock()
+
+	// Persist to in-memory history (cap at 200 entries)
+	rec := &models.HistoryRecord{
+		ID:          run.ID,
+		CreatedAt:   run.StartedAt,
+		CompletedAt: run.CompletedAt,
+		Status:      run.Status,
+		Config:      cfg,
+		Metrics:     run.Metrics,
+		Error:       run.Error,
+		DurationMs:  run.CompletedAt.Sub(run.StartedAt).Milliseconds(),
+	}
+	m.histMu.Lock()
+	m.history = append(m.history, rec)
+	if len(m.history) > 200 {
+		m.history = m.history[len(m.history)-200:]
+	}
+	m.histMu.Unlock()
 }
 
 func (m *Manager) fail(run *Run, msg string) {
@@ -287,6 +322,34 @@ func (m *Manager) Unsubscribe(id string, ch chan string) {
 		return
 	}
 	run.unsubscribe(ch)
+}
+
+// ListHistory returns completed runs, most-recent first (up to limit entries).
+func (m *Manager) ListHistory(limit int) []*models.HistoryRecord {
+	m.histMu.RLock()
+	defer m.histMu.RUnlock()
+	n := len(m.history)
+	if limit <= 0 || limit > n {
+		limit = n
+	}
+	// Return a reversed copy (newest first)
+	out := make([]*models.HistoryRecord, limit)
+	for i := 0; i < limit; i++ {
+		out[i] = m.history[n-1-i]
+	}
+	return out
+}
+
+// GetHistoryEntry returns a single history record by run ID.
+func (m *Manager) GetHistoryEntry(id string) *models.HistoryRecord {
+	m.histMu.RLock()
+	defer m.histMu.RUnlock()
+	for i := len(m.history) - 1; i >= 0; i-- {
+		if m.history[i].ID == id {
+			return m.history[i]
+		}
+	}
+	return nil
 }
 
 // Cancel aborts a running test by cancelling its context, which kills the

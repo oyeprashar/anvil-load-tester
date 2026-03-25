@@ -7,16 +7,18 @@ import (
 	"github.com/shubhamprashar/anvil/internal/runner"
 )
 
-// Server wires together the HTTP mux and the run manager.
+// Server wires together the HTTP mux and the run managers.
 type Server struct {
-	manager *runner.Manager
-	mux     *http.ServeMux
+	manager      *runner.Manager
+	suiteManager *runner.SuiteManager
+	mux          *http.ServeMux
 }
 
-func NewServer(manager *runner.Manager) *Server {
+func NewServer(manager *runner.Manager, suiteManager *runner.SuiteManager) *Server {
 	s := &Server{
-		manager: manager,
-		mux:     http.NewServeMux(),
+		manager:      manager,
+		suiteManager: suiteManager,
+		mux:          http.NewServeMux(),
 	}
 	s.registerRoutes()
 	return s
@@ -39,14 +41,25 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) registerRoutes() {
-	h := &handlers{manager: s.manager}
+	h := &handlers{manager: s.manager, suiteManager: s.suiteManager}
 
+	// Single test
 	s.mux.HandleFunc("POST /api/test/run",               h.startRun)
 	s.mux.HandleFunc("GET /api/test/{id}/stream",        h.streamRun)
 	s.mux.HandleFunc("GET /api/test/{id}/report",        h.getReport)
 	s.mux.HandleFunc("GET /api/test/{id}/html-report",   h.getHTMLReport)
 	s.mux.HandleFunc("GET /api/test/{id}/script",        h.getScript)
 	s.mux.HandleFunc("DELETE /api/test/{id}",            h.abortRun)
+
+	// Suite / DAG
+	s.mux.HandleFunc("POST /api/suite/run",              h.startSuiteRun)
+	s.mux.HandleFunc("GET /api/suite/{id}/status",       h.getSuiteStatus)
+	s.mux.HandleFunc("GET /api/suite/{id}/stream",       h.streamSuiteRun)
+
+	// Run history
+	s.mux.HandleFunc("GET /api/runs",                    h.listHistory)
+	s.mux.HandleFunc("GET /api/runs/{id}",               h.getHistoryEntry)
+
 	s.mux.HandleFunc("GET /health",                      h.health)
 }
 

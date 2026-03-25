@@ -13,7 +13,8 @@ import (
 )
 
 type handlers struct {
-	manager *runner.Manager
+	manager      *runner.Manager
+	suiteManager *runner.SuiteManager
 }
 
 // ── POST /api/test/run ────────────────────────────────────────
@@ -153,7 +154,9 @@ func (h *handlers) getScript(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
-	script, err := transpiler.Generate(cfg)
+
+	// TODO : protoContent is not being used here
+	script, _, err := transpiler.Generate(cfg)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -197,6 +200,27 @@ func (h *handlers) abortRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
+}
+
+// ── GET /api/runs ─────────────────────────────────────────────
+// Returns the last N completed runs, newest first.
+
+func (h *handlers) listHistory(w http.ResponseWriter, r *http.Request) {
+	records := h.manager.ListHistory(100)
+	writeJSON(w, http.StatusOK, records)
+}
+
+// ── GET /api/runs/{id} ────────────────────────────────────────
+// Returns a single historical run record.
+
+func (h *handlers) getHistoryEntry(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	rec := h.manager.GetHistoryEntry(id)
+	if rec == nil {
+		writeError(w, http.StatusNotFound, "run not found: "+id)
+		return
+	}
+	writeJSON(w, http.StatusOK, rec)
 }
 
 // ── GET /health ───────────────────────────────────────────────
