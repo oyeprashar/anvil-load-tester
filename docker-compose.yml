@@ -1,0 +1,22 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - K6_PATH=/usr/bin/k6
+      - ADDR=:8080
+    ports:
+      - "8080:8080"   # Anvil API
+      - "5665:5665"   # k6 web dashboard (live metrics, embedded as iframe in UI)
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

@@ -1,0 +1,18 @@
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Backend
+backend/bin/
+
+# Go
+*.exe
+*.test
+*.out
+go.sum
+
+# Docker
+.env
+
+# OS
+.DS_Store
