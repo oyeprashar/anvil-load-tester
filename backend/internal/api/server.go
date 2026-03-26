@@ -3,9 +3,33 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"regexp"
+	"strconv"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/shubhamprashar/anvil/internal/metrics"
 	"github.com/shubhamprashar/anvil/internal/runner"
 )
+
+// idPattern matches long numeric path segments (nanosecond run IDs).
+// Replaced with {id} to keep Prometheus label cardinality low.
+var idPattern = regexp.MustCompile(`/\d{10,}`)
+
+func normalizePath(p string) string {
+	return idPattern.ReplaceAllString(p, "/{id}")
+}
+
+// statusRecorder wraps ResponseWriter to capture the HTTP status code.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (sr *statusRecorder) WriteHeader(code int) {
+	sr.status = code
+	sr.ResponseWriter.WriteHeader(code)
+}
 
 // Server wires together the HTTP mux and the run managers.
 type Server struct {
@@ -37,7 +61,23 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	s.mux.ServeHTTP(w, r)
+
+	// Skip instrumentation for the /metrics scrape endpoint itself
+	if r.URL.Path == "/metrics" {
+		s.mux.ServeHTTP(w, r)
+		return
+	}
+
+	// Instrument every other request with latency + count metrics
+	sr := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+	start := time.Now()
+	s.mux.ServeHTTP(sr, r)
+	elapsed := time.Since(start).Seconds()
+
+	path := normalizePath(r.URL.Path)
+	code := strconv.Itoa(sr.status)
+	metrics.HTTPRequestDuration.WithLabelValues(r.Method, path, code).Observe(elapsed)
+	metrics.HTTPRequestsTotal.WithLabelValues(r.Method, path, code).Inc()
 }
 
 func (s *Server) registerRoutes() {
@@ -61,6 +101,9 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /api/runs/{id}",               h.getHistoryEntry)
 
 	s.mux.HandleFunc("GET /health",                      h.health)
+
+	// Prometheus scrape endpoint — served by the official promhttp handler
+	s.mux.Handle("GET /metrics", promhttp.Handler())
 }
 
 func (s *Server) ListenAndServe(addr string) error {

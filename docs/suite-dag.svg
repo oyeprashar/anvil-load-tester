@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 300" font-family="'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#64748b"/>
+    </marker>
+    <marker id="arrSkip" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#ef4444"/>
+    </marker>
+    <filter id="glowPurple">
+      <feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#7c3aed" flood-opacity="0.55"/>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="780" height="300" rx="14" fill="#0d1525"/>
+
+  <!-- ─── HAPPY PATH LABEL ─── -->
+  <text x="390" y="22" text-anchor="middle" font-size="10" fill="#475569" letter-spacing="1">EXECUTION FLOW</text>
+
+  <!-- ─── Node 1: Auth Login (gate) ─── -->
+  <rect x="30" y="80" width="170" height="100" rx="12" fill="#1e0b3a" stroke="#7c3aed" stroke-width="2.5" filter="url(#glowPurple)"/>
+  <text x="115" y="118" text-anchor="middle" font-size="14" font-weight="700" fill="#c4b5fd">🔐 Auth Login</text>
+  <text x="115" y="140" text-anchor="middle" font-size="11" fill="#a78bfa">gate node</text>
+  <rect x="60" y="152" width="110" height="16" rx="4" fill="#3b0764" opacity="0.8"/>
+  <text x="115" y="164" text-anchor="middle" font-size="9" fill="#ddd6fe" letter-spacing="0.5">IsGate: true</text>
+
+  <!-- Arrow: Auth → Product (upper) -->
+  <path d="M200 108 C235 108, 235 88, 270 88" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+  <!-- Arrow: Auth → Checkout (lower) -->
+  <path d="M200 152 C235 152, 235 172, 270 172" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- "parallel" label between the two arrows -->
+  <text x="232" y="133" text-anchor="middle" font-size="9" fill="#4b5563">parallel</text>
+
+  <!-- ─── Node 2: Product Listing ─── -->
+  <rect x="270" y="52" width="185" height="72" rx="12" fill="#0b1f3a" stroke="#3b82f6" stroke-width="2" filter="url(#shadow)"/>
+  <text x="362" y="84" text-anchor="middle" font-size="13" font-weight="700" fill="#93c5fd">📦 Product Listing</text>
+  <text x="362" y="104" text-anchor="middle" font-size="10" fill="#60a5fa">HTTP · 50 VUs · 2m ramp</text>
+
+  <!-- ─── Node 3: Checkout Flow ─── -->
+  <rect x="270" y="140" width="185" height="72" rx="12" fill="#0b1f3a" stroke="#3b82f6" stroke-width="2" filter="url(#shadow)"/>
+  <text x="362" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="#93c5fd">🛒 Checkout Flow</text>
+  <text x="362" y="192" text-anchor="middle" font-size="10" fill="#60a5fa">HTTP · 20 VUs · 1m ramp</text>
+
+  <!-- Arrow: Product → Order -->
+  <path d="M455 88 C490 88, 490 118, 525 128" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+  <!-- Arrow: Checkout → Order -->
+  <path d="M455 176 C490 176, 490 152, 525 142" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- ─── Node 4: Order Confirmation ─── -->
+  <rect x="525" y="95" width="185" height="72" rx="12" fill="#0b1f3a" stroke="#3b82f6" stroke-width="2" filter="url(#shadow)"/>
+  <text x="617" y="124" text-anchor="middle" font-size="13" font-weight="700" fill="#93c5fd">✅ Order</text>
+  <text x="617" y="144" text-anchor="middle" font-size="13" font-weight="700" fill="#93c5fd">Confirmation</text>
+
+  <!-- ─── GATE FAIL SECTION (below, clean and contained) ─── -->
+  <line x1="40" y1="244" x2="740" y2="244" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- small down arrow from gate node -->
+  <line x1="115" y1="180" x2="115" y2="244" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <circle cx="115" cy="244" r="3" fill="#ef4444"/>
+
+  <!-- fail label pill -->
+  <rect x="52" y="249" width="126" height="22" rx="5" fill="#2d0808" stroke="#ef4444" stroke-width="1"/>
+  <text x="115" y="264" text-anchor="middle" font-size="10" fill="#fca5a5">⛔ if gate fails…</text>
+
+  <!-- three skip boxes -->
+  <rect x="210" y="249" width="110" height="22" rx="5" fill="#1f0606" stroke="#7f1d1d" stroke-width="1"/>
+  <text x="265" y="264" text-anchor="middle" font-size="10" fill="#fca5a5">📦 SKIPPED</text>
+
+  <rect x="336" y="249" width="110" height="22" rx="5" fill="#1f0606" stroke="#7f1d1d" stroke-width="1"/>
+  <text x="391" y="264" text-anchor="middle" font-size="10" fill="#fca5a5">🛒 SKIPPED</text>
+
+  <rect x="462" y="249" width="150" height="22" rx="5" fill="#1f0606" stroke="#7f1d1d" stroke-width="1"/>
+  <text x="537" y="264" text-anchor="middle" font-size="10" fill="#fca5a5">✅ SKIPPED</text>
+
+  <!-- arrows between fail boxes -->
+  <line x1="178" y1="260" x2="208" y2="260" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrSkip)"/>
+  <line x1="320" y1="260" x2="334" y2="260" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrSkip)"/>
+  <line x1="446" y1="260" x2="460" y2="260" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrSkip)"/>
+</svg>

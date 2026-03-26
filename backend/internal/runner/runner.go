@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shubhamprashar/anvil/internal/metrics"
 	"github.com/shubhamprashar/anvil/internal/models"
 	"github.com/shubhamprashar/anvil/internal/transpiler"
 )
@@ -166,6 +167,7 @@ func (m *Manager) Start(ctx context.Context, cfg models.TestConfig) (string, err
 		HTMLReportPath: htmlReportPath,
 	}
 	m.runs.Store(id, run)
+	metrics.ActiveRuns.Inc()
 
 	// Run k6 asynchronously
 	go m.execute(runCtx, run, cfg, dir, scriptPath, summaryPath)
@@ -239,11 +241,11 @@ func (m *Manager) execute(ctx context.Context, run *Run, cfg models.TestConfig, 
 
 	// Parse the summary file regardless of exit code (thresholds can cause
 	// non-zero exit even on a "successful" test).
-	metrics, parseErr := parseSummary(summaryPath)
+	metricsSummary, parseErr := parseSummary(summaryPath)
 
 	run.mu.Lock()
 	run.CompletedAt = time.Now()
-	if cmdErr != nil && metrics == nil {
+	if cmdErr != nil && metricsSummary == nil {
 		// Hard failure — k6 didn't even produce a summary
 		run.Status = models.StatusFailed
 		run.Error = fmt.Sprintf("k6 exited with error: %v", cmdErr)
@@ -253,7 +255,7 @@ func (m *Manager) execute(ctx context.Context, run *Run, cfg models.TestConfig, 
 	} else {
 		// k6 ran to completion (even if some thresholds failed)
 		run.Status = models.StatusCompleted
-		run.Metrics = metrics
+		run.Metrics = metricsSummary
 		if cmdErr != nil {
 			run.Error = "one or more thresholds failed"
 		}
@@ -264,6 +266,10 @@ func (m *Manager) execute(ctx context.Context, run *Run, cfg models.TestConfig, 
 	}
 	run.subscribers = nil
 	run.mu.Unlock()
+
+	// Update Prometheus metrics
+	metrics.ActiveRuns.Dec()
+	metrics.RunsTotal.WithLabelValues(string(run.Status)).Inc()
 
 	// Persist to in-memory history (cap at 200 entries)
 	rec := &models.HistoryRecord{

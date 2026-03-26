@@ -2,9 +2,10 @@
 FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
-COPY go.mod ./
-RUN go mod download
+# Copy everything first so go mod tidy can see all imports,
+# then let it resolve + download the prometheus dependency.
 COPY . .
+RUN go mod tidy
 RUN CGO_ENABLED=0 GOOS=linux go build -o /anvil-server ./cmd/server
 
 
