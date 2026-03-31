@@ -170,7 +170,7 @@ Runs the custom k6 binary (built with [xk6-kafka v1.2.0](https://github.com/most
 Protocol: Kafka
 Brokers:  ["localhost:9092"]
 Topic:    load-test-events
-Message:  { "event": "page_view", "user": "{{$randomUUID}}" }
+Message:  { "event": "page_view", "user": "anvil-load-test" }
 ```
 
 ### Redis
@@ -219,7 +219,7 @@ Anvil instruments itself using **Prometheus** and ships with a pre-built **Grafa
 
 ### Grafana Dashboard
 
-Log into Grafana at **http://localhost:3001** (credentials: `admin` / `admin`). The **Anvil Overview** dashboard is pre-provisioned with 8 panels:
+Log into Grafana at **http://localhost:3001** (credentials: `admin` / `admin`). The **Anvil — Load Testing Framework** dashboard is pre-provisioned with 8 panels:
 
 - Active Runs (stat)
 - Runs Completed (stat)
@@ -257,6 +257,7 @@ All endpoints are served by the Go backend on port `8080`.
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/suite/run` | Execute a suite DAG. Body: `Suite` JSON. Returns `{ suiteRunId }`. |
+| `GET` | `/api/suite/{id}/status` | JSON snapshot of suite run (node statuses + overall status). |
 | `GET` | `/api/suite/{id}/stream` | SSE stream of suite node state changes. |
 
 ### Health & Monitoring
@@ -413,6 +414,12 @@ Grafana admin password is set in `docker-compose.yml` via `GF_SECURITY_ADMIN_PAS
 | DAG editor | [React Flow (@xyflow/react) 12](https://reactflow.dev) |
 | Observability | [Prometheus](https://prometheus.io) + [Grafana](https://grafana.com) |
 | Containerisation | [Docker](https://docker.com) + [Compose v2](https://docs.docker.com/compose/) |
+
+---
+
+## 🛣️ Roadmap
+
+<img src="docs/roadmap.svg" alt="Anvil Roadmap" width="100%"/>
 
 ---
 
