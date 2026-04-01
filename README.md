@@ -419,7 +419,13 @@ Grafana admin password is set in `docker-compose.yml` via `GF_SECURITY_ADMIN_PAS
 
 ## 🛣️ Roadmap
 
-<img src="docs/roadmap.png" alt="Anvil Roadmap" width="100%"/>
+| Stage | Theme | What's coming |
+|---|---|---|
+| **Stage 1** 🗄️ | **Persistence** | SQLite-backed run history that survives restarts · Save & load named test configs |
+| **Stage 2** 🔧 | **CI/CD Integration** | CLI mode (`anvil run config.yaml`) · GitHub Actions native action · Exit code driven by threshold pass/fail |
+| **Stage 3** 🤖 | **LLM Layer** | Natural language → TestConfig · Post-run AI performance summary · Anomaly detection vs historical runs |
+| **Stage 4** 🌐 | **Protocol Expansion** | WebSocket support · GraphQL support · OpenAPI spec → auto-generate TestConfig |
+| **Stage 5** 🚀 | **Scale & Collaboration** | Distributed test agents · Real-time multi-user collaboration |
 
 ---
 
