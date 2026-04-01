@@ -73,7 +73,7 @@ That's it. Four services start:
 
 ## 🏗️ Architecture
 
-<img src="docs/architecture.png" alt="Anvil Architecture Diagram" width="100%"/>
+<img src="docs/architecture.svg" alt="Anvil Architecture Diagram" width="100%"/>
 
 ### Directory Layout
 
@@ -191,7 +191,7 @@ Value:    hello-world
 
 The **Suite** tab lets you compose multiple tests into a dependency graph.
 
-<img src="docs/suite-dag.png" alt="Suite DAG example" width="100%"/>
+<img src="docs/suite-dag.svg" alt="Suite DAG example" width="100%"/>
 
 > Gate nodes (`IsGate: true`) stop all downstream nodes if they fail — protecting you from running checkout tests when auth is broken.
 
