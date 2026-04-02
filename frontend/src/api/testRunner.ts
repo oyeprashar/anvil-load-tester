@@ -85,6 +85,30 @@ function streamLogs(id: string, startedAt: Date, onUpdate: OnUpdate): Promise<vo
   });
 }
 
+// ── LLM: check if enabled ─────────────────────────────────────
+
+export async function fetchLLMStatus(): Promise<{ enabled: boolean; provider?: string; model?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/llm/status`);
+    if (!res.ok) return { enabled: false };
+    return res.json();
+  } catch {
+    return { enabled: false };
+  }
+}
+
+// ── LLM: summarize a completed run ────────────────────────────
+
+export async function summarizeRun(runId: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/llm/summarize/${runId}`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error ?? 'Failed to get AI summary');
+  }
+  const data = await res.json();
+  return data.summary;
+}
+
 // ── Abort: DELETE the run ─────────────────────────────────────
 
 export async function abortRun(id: string): Promise<void> {

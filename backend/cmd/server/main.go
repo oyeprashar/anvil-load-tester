@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/shubhamprashar/anvil/internal/api"
+	"github.com/shubhamprashar/anvil/internal/llm"
 	"github.com/shubhamprashar/anvil/internal/runner"
 )
 
@@ -19,9 +20,20 @@ func main() {
 		addr = ":8080"
 	}
 
-	manager      := runner.New(k6Path)
+	// LLM summarizer — nil when LLM_PROVIDER is unset (feature disabled)
+	summarizer, err := llm.New(llm.FromEnv())
+	if err != nil {
+		log.Fatalf("LLM config error: %v", err)
+	}
+	if summarizer != nil {
+		log.Printf("LLM enabled: provider=%s model=%s", summarizer.Provider(), summarizer.Model())
+	} else {
+		log.Println("LLM disabled (set LLM_PROVIDER to enable AI summaries)")
+	}
+
+	manager := runner.New(k6Path)
 	suiteManager := runner.NewSuiteManager(manager)
-	server       := api.NewServer(manager, suiteManager)
+	server := api.NewServer(manager, suiteManager, summarizer)
 
 	log.Fatal(server.ListenAndServe(addr))
 }

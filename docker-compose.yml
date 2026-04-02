@@ -3,6 +3,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
       - K6_PATH=/usr/bin/k6
       - ADDR=:8080

@@ -39,6 +39,7 @@
 | 🖥️ | **k6 web dashboard** | Embedded live metrics iframe (port `5665`) |
 | 📄 | **HTML report export** | Standalone k6 web dashboard snapshot per run |
 | 📈 | **Self-monitoring** | Prometheus `/metrics` endpoint + pre-built Grafana dashboard for Anvil itself |
+| 🤖 | **AI run summaries** | LLM-powered plain-English analysis of every run (OpenAI / Anthropic / Ollama) |
 | 🐳 | **One-command deploy** | Single `docker compose up --build` starts everything |
 
 ---
@@ -85,11 +86,14 @@ anvil/
 │   │   ├── api/
 │   │   │   ├── server.go      # HTTP mux, Prometheus middleware, /metrics route
 │   │   │   ├── handlers.go    # REST handlers (run, stream, report, history)
-│   │   │   └── suite_handlers.go  # Suite DAG execution handlers
+│   │   │   ├── suite_handlers.go  # Suite DAG execution handlers
+│   │   │   └── llm_handlers.go    # LLM status + summarize endpoints
 │   │   ├── metrics/
 │   │   │   └── metrics.go     # Prometheus metric definitions (Gauges, Counters, Histograms)
 │   │   ├── models/
 │   │   │   └── models.go      # Shared types: TestConfig, Run, Suite, HistoryRecord, …
+│   │   ├── llm/
+│   │   │   └── llm.go         # Provider-agnostic LLM interface (OpenAI / Anthropic / Ollama / mock)
 │   │   ├── runner/
 │   │   │   ├── runner.go      # k6 subprocess manager, SSE broadcaster, history ring buffer
 │   │   │   └── suite_runner.go  # DAG topological sort + parallel node execution
@@ -260,6 +264,13 @@ All endpoints are served by the Go backend on port `8080`.
 | `GET` | `/api/suite/{id}/status` | JSON snapshot of suite run (node statuses + overall status). |
 | `GET` | `/api/suite/{id}/stream` | SSE stream of suite node state changes. |
 
+### LLM Summaries
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/llm/status` | `{ enabled, provider, model }` — whether LLM is configured. |
+| `POST` | `/api/llm/summarize/{id}` | Returns `{ summary }` — plain-English AI analysis of the run. `501` if LLM is disabled. |
+
 ### Health & Monitoring
 
 | Method | Path | Description |
@@ -388,6 +399,85 @@ Anvil follows a clean internal package structure. Here's where things live:
 
 ---
 
+## 🤖 LLM-Powered AI Summaries
+
+After a test run completes, Anvil can call an LLM to generate a plain-English paragraph analysing your results — explaining what the latency numbers mean, flagging error rates, and highlighting bottlenecks.
+
+This feature is **fully opt-in**. If `LLM_PROVIDER` is not set, the AI Summary tab is hidden and everything else works exactly as before.
+
+### Enabling LLM summaries
+
+> ⚠️ **Never put your API key directly in `docker-compose.yml`** — it will be committed to GitHub and exposed publicly.
+
+**Step 1 — Copy the example env file**
+```bash
+cp .env.example .env
+```
+
+**Step 2 — Fill in your values in `.env`**
+```bash
+LLM_PROVIDER=openai
+LLM_API_KEY=sk-...
+LLM_MODEL=gpt-4o-mini
+```
+
+**Step 3 — `docker-compose.yml` already reads `.env` automatically**
+
+The `backend` service is configured to pick up your `.env` file via `env_file`. You don't need to touch `docker-compose.yml` at all.
+
+```bash
+docker compose up --build
+```
+
+> `.env` is listed in `.gitignore` — it will never be committed. `.env.example` is committed instead so contributors know what variables are needed.
+
+### Supported providers
+
+| Provider | `LLM_PROVIDER` | Default model | Needs API key? |
+|---|---|---|---|
+| OpenAI | `openai` | `gpt-4o-mini` | Yes |
+| Anthropic | `anthropic` | `claude-haiku-4-5-20251001` | Yes |
+| Ollama (local) | `ollama` | `llama3` | No |
+| Mock (local dev) | `mock` | `mock-model` | No |
+
+### Running locally with Ollama (free, no API key)
+
+```bash
+# Install Ollama: https://ollama.com
+ollama pull llama3
+
+# Then in docker-compose.yml:
+# LLM_PROVIDER=ollama
+# LLM_BASE_URL=http://host.docker.internal:11434
+```
+
+### Testing the UI without any API key (mock provider)
+
+Want to verify the AI Summary tab works locally before wiring up a real LLM? Use the built-in `mock` provider — it returns a dummy summary instantly with zero external calls.
+
+```bash
+echo "LLM_PROVIDER=mock" > .env
+docker compose up --build
+```
+
+Run any test. After it completes, the **🤖 AI Summary** tab will appear. Clicking it shows a placeholder response confirming the full UI → backend → LLM flow is wired correctly. Swap `mock` for `openai` (or another provider) whenever you're ready to go live.
+
+### Disabling LLM summaries
+
+Remove or leave `LLM_PROVIDER` unset. The AI Summary tab will not appear in the UI and no external API calls are made.
+
+### How it works
+
+1. Run completes → metrics are stored in the history ring buffer
+2. User clicks the **🤖 AI Summary** tab in the Results panel
+3. Frontend calls `POST /api/llm/summarize/{runId}`
+4. Backend formats the `MetricsSummary` into a prompt and calls the configured LLM
+5. The plain-English summary is returned and displayed
+
+The LLM call is fully async — it never blocks the test run, log streaming, or metrics display.
+
+---
+
 ## 🔧 Configuration
 
 All configuration is via environment variables:
@@ -396,6 +486,10 @@ All configuration is via environment variables:
 |---|---|---|
 | `ADDR` | `:8080` | TCP address the Go server listens on |
 | `K6_PATH` | `k6` | Path to the k6 binary |
+| `LLM_PROVIDER` | _(unset)_ | LLM provider: `openai`, `anthropic`, `ollama`, or `mock` (local testing) |
+| `LLM_API_KEY` | _(unset)_ | API key for the chosen provider |
+| `LLM_MODEL` | _(provider default)_ | Model name override |
+| `LLM_BASE_URL` | _(provider default)_ | Custom endpoint URL (e.g. for Ollama or proxies) |
 
 Grafana admin password is set in `docker-compose.yml` via `GF_SECURITY_ADMIN_PASSWORD`.
 
@@ -423,7 +517,7 @@ Grafana admin password is set in `docker-compose.yml` via `GF_SECURITY_ADMIN_PAS
 |---|---|---|
 | **Stage 1** 🗄️ | **Persistence** | SQLite-backed run history that survives restarts · Save & load named test configs |
 | **Stage 2** 🔧 | **CI/CD Integration** | CLI mode (`anvil run config.yaml`) · GitHub Actions native action · Exit code driven by threshold pass/fail |
-| **Stage 3** 🤖 | **LLM Layer** | Natural language → TestConfig · Post-run AI performance summary · Anomaly detection vs historical runs |
+| **Stage 3** 🤖 | **LLM Layer** | ✅ Post-run AI performance summary (shipped) · Natural language → TestConfig · Anomaly detection vs historical baselines |
 | **Stage 4** 🌐 | **Protocol Expansion** | WebSocket support · GraphQL support · OpenAPI spec → auto-generate TestConfig |
 | **Stage 5** 🚀 | **Scale & Collaboration** | Distributed test agents · Real-time multi-user collaboration |
 

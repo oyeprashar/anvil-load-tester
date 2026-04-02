@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { TestRun, MetricsSummary } from '../types';
 import MetricsChart from './MetricsChart';
+import { fetchLLMStatus, summarizeRun } from '../api/testRunner';
 
 // k6 web dashboard always binds on this port (mapped in docker-compose).
 const DASHBOARD_URL = 'http://localhost:5665';
@@ -10,7 +11,7 @@ interface Props {
   onAbort?: () => void;
 }
 
-type Tab = 'dashboard' | 'logs' | 'metrics';
+type Tab = 'dashboard' | 'logs' | 'metrics' | 'ai';
 
 // How long to wait before mounting the iframe, giving k6's dashboard
 // HTTP server time to start listening on port 5665.
@@ -20,6 +21,19 @@ export default function ResultsPanel({ run, onAbort }: Props) {
   const logRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>('dashboard');
   const [dashboardReady, setDashboardReady] = useState(false);
+  const [llmEnabled, setLlmEnabled] = useState(false);
+  const [llmModel, setLlmModel] = useState('');
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  // Check once on mount if LLM is enabled
+  useEffect(() => {
+    fetchLLMStatus().then(s => {
+      setLlmEnabled(s.enabled);
+      if (s.model) setLlmModel(s.model);
+    });
+  }, []);
 
   // Auto-scroll logs to bottom as they stream in
   useEffect(() => {
@@ -38,8 +52,26 @@ export default function ResultsPanel({ run, onAbort }: Props) {
     }
     if ((run?.status === 'completed' || run?.status === 'failed') && run?.metrics) {
       setTab('metrics');
+      // Reset AI summary state for the new run
+      setAiSummary(null);
+      setAiError(null);
     }
   }, [run?.id, run?.status]);
+
+  const handleAiTab = async () => {
+    setTab('ai');
+    if (aiSummary || aiLoading || !run?.id) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const summary = await summarizeRun(run.id);
+      setAiSummary(summary);
+    } catch (e: unknown) {
+      setAiError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   if (!run) return <EmptyState />;
 
@@ -129,6 +161,7 @@ export default function ResultsPanel({ run, onAbort }: Props) {
             dashboard: '📊 Live Dashboard',
             logs:      '📋 Logs',
             metrics:   '📈 Metrics',
+            ai:        '🤖 AI Summary',
           };
           const disabled = t === 'metrics' && !run.metrics;
           return (
@@ -149,6 +182,21 @@ export default function ResultsPanel({ run, onAbort }: Props) {
             </button>
           );
         })}
+        {/* AI Summary tab — only shown when LLM is enabled and run is done */}
+        {llmEnabled && (run.status === 'completed' || run.status === 'failed') && (
+          <button
+            onClick={handleAiTab}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: '6px 14px', fontSize: 12, fontWeight: 600,
+              color: tab === 'ai' ? '#a855f7' : 'var(--text-muted)',
+              borderBottom: tab === 'ai' ? '2px solid #a855f7' : '2px solid transparent',
+              marginBottom: -1,
+            }}
+          >
+            🤖 AI Summary
+          </button>
+        )}
       </div>
 
       {/* ── Tab content ── */}
@@ -252,6 +300,64 @@ export default function ResultsPanel({ run, onAbort }: Props) {
         {tab === 'metrics' && run.metrics && (
           <div style={{ padding: 16, overflowY: 'auto' }}>
             <MetricsChart metrics={run.metrics} />
+          </div>
+        )}
+
+        {/* AI Summary — only shown when LLM is enabled */}
+        {tab === 'ai' && (
+          <div style={{
+            padding: 20, display: 'flex', flexDirection: 'column', gap: 16,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#a855f7' }}>🤖 AI Summary</span>
+              {llmModel && (
+                <span style={{
+                  fontSize: 10, padding: '2px 8px', borderRadius: 20,
+                  background: 'rgba(168,85,247,0.12)', color: '#a855f7',
+                  border: '1px solid rgba(168,85,247,0.25)',
+                }}>
+                  {llmModel}
+                </span>
+              )}
+            </div>
+
+            {aiLoading && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                color: 'var(--text-muted)', fontSize: 13,
+              }}>
+                <span style={{
+                  display: 'inline-block', width: 16, height: 16,
+                  border: '2px solid rgba(168,85,247,0.3)',
+                  borderTopColor: '#a855f7',
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite',
+                }} />
+                Analysing results…
+              </div>
+            )}
+
+            {aiError && (
+              <div style={{
+                background: 'var(--error-bg)', border: '1px solid rgba(239,68,68,0.3)',
+                borderRadius: 'var(--radius-md)', padding: '12px 14px',
+                fontSize: 12, color: 'var(--error)',
+              }}>
+                {aiError}
+              </div>
+            )}
+
+            {aiSummary && (
+              <div style={{
+                background: 'rgba(168,85,247,0.06)',
+                border: '1px solid rgba(168,85,247,0.2)',
+                borderRadius: 'var(--radius-md)', padding: '16px 18px',
+                fontSize: 14, lineHeight: 1.75,
+                color: 'var(--text-primary)',
+              }}>
+                {aiSummary}
+              </div>
+            )}
           </div>
         )}
       </div>

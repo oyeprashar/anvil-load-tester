@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/shubhamprashar/anvil/internal/llm"
 	"github.com/shubhamprashar/anvil/internal/metrics"
 	"github.com/shubhamprashar/anvil/internal/runner"
 )
@@ -31,17 +32,29 @@ func (sr *statusRecorder) WriteHeader(code int) {
 	sr.ResponseWriter.WriteHeader(code)
 }
 
+// Flush forwards the Flush call to the underlying ResponseWriter if it
+// implements http.Flusher. This is required for SSE streams to work —
+// without it, the type assertion w.(http.Flusher) in streamRun fails
+// and every stream request returns 500.
+func (sr *statusRecorder) Flush() {
+	if f, ok := sr.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 // Server wires together the HTTP mux and the run managers.
 type Server struct {
 	manager      *runner.Manager
 	suiteManager *runner.SuiteManager
+	summarizer   llm.Summarizer // nil when LLM is disabled
 	mux          *http.ServeMux
 }
 
-func NewServer(manager *runner.Manager, suiteManager *runner.SuiteManager) *Server {
+func NewServer(manager *runner.Manager, suiteManager *runner.SuiteManager, summarizer llm.Summarizer) *Server {
 	s := &Server{
 		manager:      manager,
 		suiteManager: suiteManager,
+		summarizer:   summarizer,
 		mux:          http.NewServeMux(),
 	}
 	s.registerRoutes()
@@ -82,6 +95,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) registerRoutes() {
 	h := &handlers{manager: s.manager, suiteManager: s.suiteManager}
+	lh := &llmHandlers{summarizer: s.summarizer, mgr: s.manager}
 
 	// Single test
 	s.mux.HandleFunc("POST /api/test/run",               h.startRun)
@@ -101,6 +115,10 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /api/runs/{id}",               h.getHistoryEntry)
 
 	s.mux.HandleFunc("GET /health",                      h.health)
+
+	// LLM summarization (disabled when LLM_PROVIDER is unset)
+	s.mux.HandleFunc("GET /api/llm/status",              lh.status)
+	s.mux.HandleFunc("POST /api/llm/summarize/{id}",     lh.summarize)
 
 	// Prometheus scrape endpoint — served by the official promhttp handler
 	s.mux.Handle("GET /metrics", promhttp.Handler())

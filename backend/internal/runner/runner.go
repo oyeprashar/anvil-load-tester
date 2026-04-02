@@ -31,6 +31,7 @@ const DashboardPort = "5665"
 // Run holds the live state of a single k6 test execution.
 type Run struct {
 	ID             string
+	Config         models.TestConfig // original config, stored so summarize works without history
 	Status         models.RunStatus
 	Metrics        *models.MetricsSummary
 	Error          string
@@ -161,6 +162,7 @@ func (m *Manager) Start(ctx context.Context, cfg models.TestConfig) (string, err
 	now := time.Now()
 	run := &Run{
 		ID:             id,
+		Config:         cfg,
 		Status:         models.StatusRunning,
 		StartedAt:      now,
 		cancel:         cancel,
@@ -260,18 +262,15 @@ func (m *Manager) execute(ctx context.Context, run *Run, cfg models.TestConfig, 
 			run.Error = "one or more thresholds failed"
 		}
 	}
-	// Drain and close all subscriber channels to signal end-of-stream
-	for _, ch := range run.subscribers {
-		close(ch)
-	}
-	run.subscribers = nil
 	run.mu.Unlock()
 
 	// Update Prometheus metrics
 	metrics.ActiveRuns.Dec()
 	metrics.RunsTotal.WithLabelValues(string(run.Status)).Inc()
 
-	// Persist to in-memory history (cap at 200 entries)
+	// Persist to in-memory history BEFORE closing subscriber channels.
+	// This ensures the history entry exists by the time the frontend receives
+	// the "done" SSE event and the user can click "AI Summary".
 	rec := &models.HistoryRecord{
 		ID:          run.ID,
 		CreatedAt:   run.StartedAt,
@@ -288,6 +287,15 @@ func (m *Manager) execute(ctx context.Context, run *Run, cfg models.TestConfig, 
 		m.history = m.history[len(m.history)-200:]
 	}
 	m.histMu.Unlock()
+
+	// Now signal end-of-stream to all subscribers. They receive the "done"
+	// event only after the history entry is already committed above.
+	run.mu.Lock()
+	for _, ch := range run.subscribers {
+		close(ch)
+	}
+	run.subscribers = nil
+	run.mu.Unlock()
 }
 
 func (m *Manager) fail(run *Run, msg string) {
