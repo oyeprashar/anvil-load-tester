@@ -517,7 +517,7 @@ Grafana admin password is set in `docker-compose.yml` via `GF_SECURITY_ADMIN_PAS
 |---|---|---|
 | **Stage 1** 🗄️ | **Persistence** | SQLite-backed run history that survives restarts · Save & load named test configs |
 | **Stage 2** 🔧 | **CI/CD Integration** | CLI mode (`anvil run config.yaml`) · GitHub Actions native action · Exit code driven by threshold pass/fail |
-| **Stage 3** 🤖 | **LLM Layer** | ✅ Post-run AI performance summary (shipped) · Natural language → TestConfig · Anomaly detection vs historical baselines |
+| **Stage 3** 🤖 | **LLM Layer** | Post-run AI performance summary (shipped) · Natural language → TestConfig · Anomaly detection vs historical baselines |
 | **Stage 4** 🌐 | **Protocol Expansion** | WebSocket support · GraphQL support · OpenAPI spec → auto-generate TestConfig |
 | **Stage 5** 🚀 | **Scale & Collaboration** | Distributed test agents · Real-time multi-user collaboration |
 
