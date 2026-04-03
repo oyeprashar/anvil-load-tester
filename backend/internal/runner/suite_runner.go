@@ -317,11 +317,25 @@ func (sm *SuiteManager) runNode(
 	}
 
 	run := sm.manager.Get(runID)
-	if run == nil || run.Status == models.StatusFailed {
-		errMsg := ""
-		if run != nil {
-			errMsg = run.Error
+
+	// A node is considered failed if:
+	// 1. The run itself failed (k6 exited non-zero / threshold breach), OR
+	// 2. The HTTP error rate is 100% — all requests failed (e.g. bad URL), even
+	//    though k6 exited cleanly because no threshold was configured.
+	nodeActuallyFailed := func() (bool, string) {
+		if run == nil {
+			return true, "run not found"
 		}
+		if run.Status == models.StatusFailed {
+			return true, run.Error
+		}
+		if run.Metrics != nil && run.Metrics.HTTPReqFailed.Rate >= 1.0 {
+			return true, fmt.Sprintf("100%% of HTTP requests failed (check your URL or endpoint)")
+		}
+		return false, ""
+	}
+
+	if failed, errMsg := nodeActuallyFailed(); failed {
 		sr.setNodeStatus(node.ID, models.StatusFailed, runID, errMsg)
 		if node.IsGate {
 			mu.Lock()
