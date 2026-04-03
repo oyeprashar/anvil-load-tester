@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" font-family="'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="s1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a5f"/>
+      <stop offset="100%" style="stop-color:#1e40af"/>
+    </linearGradient>
+    <linearGradient id="s2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#14532d"/>
+      <stop offset="100%" style="stop-color:#15803d"/>
+    </linearGradient>
+    <linearGradient id="s3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4c1d95"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="s4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c2d12"/>
+      <stop offset="100%" style="stop-color:#ea580c"/>
+    </linearGradient>
+    <linearGradient id="s5" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#831843"/>
+      <stop offset="100%" style="stop-color:#db2777"/>
+    </linearGradient>
+    <filter id="glow1"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#3b82f6" flood-opacity="0.4"/></filter>
+    <filter id="glow2"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#22c55e" flood-opacity="0.4"/></filter>
+    <filter id="glow3"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#a855f7" flood-opacity="0.4"/></filter>
+    <filter id="glow4"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#f97316" flood-opacity="0.4"/></filter>
+    <filter id="glow5"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#ec4899" flood-opacity="0.4"/></filter>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="620" rx="16" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="450" y="44" text-anchor="middle" font-size="22" font-weight="800" fill="#f1f5f9" letter-spacing="1">⚒️  Anvil Roadmap</text>
+  <text x="450" y="66" text-anchor="middle" font-size="12" fill="#64748b">What's coming next</text>
+
+  <!-- Dotted timeline spine -->
+  <line x1="450" y1="88" x2="450" y2="580" stroke="#334155" stroke-width="2" stroke-dasharray="6,4"/>
+
+  <!-- ── STAGE 1 (left) ── -->
+  <circle cx="450" cy="120" r="10" fill="#3b82f6" filter="url(#glow1)"/>
+  <rect x="30" y="88" width="380" height="100" rx="14" fill="url(#s1)" filter="url(#glow1)" opacity="0.95"/>
+  <line x1="410" y1="120" x2="440" y2="120" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="50" y="116" font-size="11" font-weight="700" fill="#93c5fd" letter-spacing="2">STAGE 1</text>
+  <text x="50" y="138" font-size="15" font-weight="800" fill="#ffffff">🗄️  Persistence</text>
+  <text x="50" y="158" font-size="11" fill="#bfdbfe">· SQLite-backed run history</text>
+  <text x="50" y="174" font-size="11" fill="#bfdbfe">· Save &amp; load named test configs</text>
+
+  <!-- ── STAGE 2 (right) ── -->
+  <circle cx="450" cy="240" r="10" fill="#22c55e" filter="url(#glow2)"/>
+  <rect x="490" y="192" width="380" height="110" rx="14" fill="url(#s2)" filter="url(#glow2)" opacity="0.95"/>
+  <line x1="460" y1="240" x2="490" y2="240" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="510" y="218" font-size="11" font-weight="700" fill="#86efac" letter-spacing="2">STAGE 2</text>
+  <text x="510" y="240" font-size="15" font-weight="800" fill="#ffffff">🔧  CI/CD Integration</text>
+  <text x="510" y="260" font-size="11" fill="#bbf7d0">· CLI mode  (anvil run config.yaml)</text>
+  <text x="510" y="276" font-size="11" fill="#bbf7d0">· GitHub Actions native action</text>
+  <text x="510" y="292" font-size="11" fill="#bbf7d0">· Exit code based on threshold pass/fail</text>
+
+  <!-- ── STAGE 3 (left) ── -->
+  <circle cx="450" cy="376" r="10" fill="#a855f7" filter="url(#glow3)"/>
+  <rect x="30" y="332" width="380" height="110" rx="14" fill="url(#s3)" filter="url(#glow3)" opacity="0.95"/>
+  <line x1="410" y1="376" x2="440" y2="376" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="50" y="358" font-size="11" font-weight="700" fill="#e9d5ff" letter-spacing="2">STAGE 3</text>
+  <text x="50" y="380" font-size="15" font-weight="800" fill="#ffffff">🤖  LLM Layer</text>
+  <text x="50" y="400" font-size="11" fill="#e9d5ff">· Natural language → TestConfig</text>
+  <text x="50" y="416" font-size="11" fill="#e9d5ff">· Post-run AI performance summary</text>
+  <text x="50" y="432" font-size="11" fill="#e9d5ff">· Anomaly detection vs historical runs</text>
+
+  <!-- ── STAGE 4 (right) ── -->
+  <circle cx="450" cy="496" r="10" fill="#f97316" filter="url(#glow4)"/>
+  <rect x="490" y="452" width="380" height="110" rx="14" fill="url(#s4)" filter="url(#glow4)" opacity="0.95"/>
+  <line x1="460" y1="496" x2="490" y2="496" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="510" y="474" font-size="11" font-weight="700" fill="#fed7aa" letter-spacing="2">STAGE 4</text>
+  <text x="510" y="496" font-size="15" font-weight="800" fill="#ffffff">🌐  Protocol Expansion</text>
+  <text x="510" y="516" font-size="11" fill="#ffedd5">· WebSocket support</text>
+  <text x="510" y="532" font-size="11" fill="#ffedd5">· GraphQL support</text>
+  <text x="510" y="548" font-size="11" fill="#ffedd5">· OpenAPI spec → auto-generate TestConfig</text>
+
+  <!-- ── STAGE 5 (center bottom) ── -->
+  <circle cx="450" cy="580" r="10" fill="#ec4899" filter="url(#glow5)"/>
+  <rect x="200" y="592" width="500" height="20" rx="6" fill="url(#s5)" opacity="0.15"/>
+  <text x="450" y="606" text-anchor="middle" font-size="11" font-weight="700" fill="#fbcfe8" letter-spacing="2">STAGE 5  —  🚀  Scale &amp; Collaboration</text>
+  <text x="450" y="618" text-anchor="middle" font-size="10" fill="#f9a8d4">Distributed test agents  ·  Real-time multi-user collaboration</text>
+
+  <!-- Footer -->
+  <text x="450" y="640" text-anchor="middle" font-size="9" fill="#334155">Columbia University · Topics in Software Engineering · 2025</text>
+</svg>
