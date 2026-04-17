@@ -76,8 +76,8 @@ That's it. Four services start:
 
 <img src="docs/architecture.svg" alt="Anvil Architecture Diagram" width="100%"/>
 
-## Evaluation 
-Please refer to the final report in the docs for a detailed table comparing Anvil with other load testing frameworks. We’ve kept it separate to avoid unnecessarily increasing the length of this document.
+## Evaluation & AI Usage
+Please refer to the final report in the docs for a detailed table comparing Anvil with other load testing frameworks. We’ve kept it separate to avoid unnecessarily increasing the length of this document. AI usage is also mentioned in the same document.
 ### Directory Layout
 
 ```
