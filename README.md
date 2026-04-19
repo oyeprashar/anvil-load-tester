@@ -77,6 +77,9 @@ That's it. Four services start:
 <img src="docs/architecture.svg" alt="Anvil Architecture Diagram" width="100%"/>
 
 ## Evaluation
+
+The evaluation of Anvil was done by comparing it against existing load testing frameworks. Since this project doesn’t fit into a standard benchmarking setup, there wasn’t a widely accepted benchmark to rely on.
+
 ### Why was k6 chosen as the underlying engine for Anvil?
 Some pointers considered before selecting k6 were
 
