@@ -76,8 +76,31 @@ That's it. Four services start:
 
 <img src="docs/architecture.svg" alt="Anvil Architecture Diagram" width="100%"/>
 
-## Evaluation & AI Usage
-Please refer to the final report in the docs for a detailed table comparing Anvil with other load testing frameworks. We’ve kept it separate to avoid unnecessarily increasing the length of this document. AI usage is also mentioned in the same document.
+## Evaluation
+### Why was k6 chosen as the underlying engine for Anvil?
+Some pointers considered before selecting k6 were
+
+- The metrics are well structured in the JSON format, which makes it pretty easy to ingest by the backend server and a common format for data exchange between the frontend and backend. 
+- We don’t need to parse the logs to understand if the load testing is failing or if there is some unexpected issue, as the signals by k6 are pretty easy to interpret.
+- Already well known and widely used across various startups, so the developers already have an idea when debugging in case something goes wrong in their self hosted Anvl. 
+- Well maintained and open-sourced
+- Other frameworks were either paid, missing protocols, or just not well supported by the community
+
+
+| Tool        | Requires Custom Scripts        | Web UI                | Multi-Protocol                  | Real-Time Streaming | LLM Integration     | License                  |
+|------------|------------------------------|-----------------------|--------------------------------|---------------------|---------------------|--------------------------|
+| k6         | Yes (JavaScript)             | No (CLI only)         | HTTP, gRPC, Kafka*             | No                  | No                  | Free / OSS               |
+| Locust     | Yes (Python)                 | Basic (read-only)     | HTTP only                      | No                  | No                  | Free / OSS               |
+| JMeter     | XML config (complex)         | Desktop GUI           | HTTP, FTP, JDBC                | No                  | No                  | Free / OSS               |
+| Gatling    | Yes (Scala DSL)              | No (CLI only)         | HTTP, WebSocket                | No                  | No                  | Free / OSS               |
+| Artillery  | YAML + JS hooks              | No (CLI only)         | HTTP, WebSocket                | No                  | No                  | Free / OSS               |
+| BlazeMeter | No (GUI)                     | Yes (full)            | HTTP, gRPC                     | Yes                 | No                  | Commercial ($500+/mo)    |
+| **Anvil**  | **No (GUI)**                 | **Yes (full)**        | **HTTP, gRPC, Kafka, Redis**   | **Yes (SSE)**       | **Yes (built-in)**  | **Free / OSS**           |
+
+
+## AI Usage 
+Claude was used to help me debug and write complex code. The documentation was also prettified and paraphrased to make sure it is easier and more comprehensive for the open-source community. Diagrams were generated with the help of AI, which converted basic diagrams into something pretty and easier to understand for the readers.
+
 ### Directory Layout
 
 ```
